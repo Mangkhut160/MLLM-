@@ -50,26 +50,35 @@ def build_canonical_records(
     repo_root: Path,
 ) -> tuple[list[dict[str, object]], dict[str, int]]:
     records: list[dict[str, object]] = []
-    dropped = 0
+    stats = {
+        "kept": 0,
+        "dropped": 0,
+        "dropped_missing_id": 0,
+        "dropped_missing_images": 0,
+        "dropped_bad_person_info": 0,
+    }
 
     with csv_path.open("r", newline="", encoding="utf-8-sig") as handle:
         reader = csv.DictReader(handle)
         for row in reader:
             sample_id = (row.get("id") or "").strip()
             if not sample_id:
-                dropped += 1
+                stats["dropped"] += 1
+                stats["dropped_missing_id"] += 1
                 continue
 
             brand_image = _resolve_brand_image(brand_dir, sample_id)
             spec_image = _resolve_spec_image(spec_dir, sample_id)
 
             if not brand_image or not spec_image:
-                dropped += 1
+                stats["dropped"] += 1
+                stats["dropped_missing_images"] += 1
                 continue
             try:
                 parsed_person_info = parse_person_info(row.get("person_info", ""))
             except ValueError:
-                dropped += 1
+                stats["dropped"] += 1
+                stats["dropped_bad_person_info"] += 1
                 continue
 
             records.append(
@@ -87,5 +96,6 @@ def build_canonical_records(
                     "output": map_labels(row.get("label", "")),
                 }
             )
+            stats["kept"] += 1
 
-    return records, {"kept": len(records), "dropped": dropped}
+    return records, stats

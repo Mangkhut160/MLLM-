@@ -1,5 +1,7 @@
 import csv
 import shutil
+import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -74,7 +76,13 @@ def test_build_canonical_records_uses_exact_png_and_prefers_id_png():
             repo_root=temp_dir,
         )
 
-        assert stats == {"kept": 1, "dropped": 1}
+        assert stats == {
+            "kept": 1,
+            "dropped": 1,
+            "dropped_missing_id": 0,
+            "dropped_missing_images": 1,
+            "dropped_bad_person_info": 0,
+        }
         assert records == [
             {
                 "sample_id": "123",
@@ -120,7 +128,78 @@ def test_build_canonical_records_drops_malformed_person_info():
             repo_root=temp_dir,
         )
 
-        assert stats == {"kept": 0, "dropped": 1}
+        assert stats == {
+            "kept": 0,
+            "dropped": 1,
+            "dropped_missing_id": 0,
+            "dropped_missing_images": 0,
+            "dropped_bad_person_info": 1,
+        }
         assert records == []
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_build_canonical_records_reports_drop_reasons():
+    temp_dir = _make_temp_dir()
+
+    try:
+        brand_dir = temp_dir / "brand_new" / "brand_new"
+        spec_dir = temp_dir / "charge_new" / "charge_new"
+        brand_dir.mkdir(parents=True)
+        spec_dir.mkdir(parents=True)
+
+        (brand_dir / "111.png").write_bytes(b"brand")
+        (spec_dir / "111.png").write_bytes(b"spec")
+        (brand_dir / "333.png").write_bytes(b"brand")
+        (spec_dir / "333.png").write_bytes(b"spec")
+
+        csv_path = temp_dir / "data.csv"
+        valid = "2024-12-20 15:51:43$%$45V$%$天能$%$72Ah"
+        invalid = "2024-12-20$%$45V$%$天能"
+        _write_csv(
+            csv_path,
+            [
+                {"id": "111", "person_info": valid, "label": "label-a"},
+                {"id": "", "person_info": valid, "label": "label-b"},
+                {"id": "222", "person_info": valid, "label": "label-c"},
+                {"id": "333", "person_info": invalid, "label": "label-d"},
+            ],
+        )
+
+        records, stats = build_canonical_records(
+            csv_path=csv_path,
+            brand_dir=brand_dir,
+            spec_dir=spec_dir,
+            repo_root=temp_dir,
+        )
+
+        assert len(records) == 1
+        assert stats == {
+            "kept": 1,
+            "dropped": 3,
+            "dropped_missing_id": 1,
+            "dropped_missing_images": 1,
+            "dropped_bad_person_info": 1,
+        }
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_build_canonical_dataset_cli_fails_for_invalid_explicit_brand_dir():
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/build_canonical_dataset.py",
+            "--brand-dir",
+            "does-not-exist",
+            "--output",
+            "data/canonical/test-invalid.jsonl",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "--brand-dir directory not found" in (result.stdout + result.stderr)

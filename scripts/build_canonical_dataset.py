@@ -15,14 +15,17 @@ def _resolve_path(repo_root: Path, value: str) -> Path:
     return path if path.is_absolute() else repo_root / path
 
 
-def _resolve_image_dir(repo_root: Path, preferred: str, fallback: str) -> Path:
+def _resolve_image_dir(
+    repo_root: Path, preferred: str, fallback: str, *, allow_fallback: bool
+) -> Path:
     preferred_path = _resolve_path(repo_root, preferred)
     if preferred_path.is_dir():
         return preferred_path
 
-    fallback_path = _resolve_path(repo_root, fallback)
-    if fallback_path.is_dir():
-        return fallback_path
+    if allow_fallback:
+        fallback_path = _resolve_path(repo_root, fallback)
+        if fallback_path.is_dir():
+            return fallback_path
 
     return preferred_path
 
@@ -59,8 +62,18 @@ def main() -> int:
 
     repo_root = REPO_ROOT
     csv_path = _resolve_path(repo_root, args.csv)
-    brand_dir = _resolve_image_dir(repo_root, args.brand_dir, "brand_new")
-    spec_dir = _resolve_image_dir(repo_root, args.spec_dir, "charge_new")
+    brand_dir = _resolve_image_dir(
+        repo_root,
+        args.brand_dir,
+        "brand_new",
+        allow_fallback=args.brand_dir == "brand_new/brand_new",
+    )
+    spec_dir = _resolve_image_dir(
+        repo_root,
+        args.spec_dir,
+        "charge_new",
+        allow_fallback=args.spec_dir == "charge_new/charge_new",
+    )
     output_path = _resolve_path(repo_root, args.output)
 
     _require_file(csv_path, "--csv")
@@ -79,7 +92,17 @@ def main() -> int:
         for record in records:
             handle.write(json.dumps(record, ensure_ascii=False) + "\n")
 
-    print(f"Kept {stats['kept']} rows, dropped {stats['dropped']} rows.")
+    print(
+        "Kept {kept} rows, dropped {dropped} rows "
+        "(missing_id={missing_id}, missing_images={missing_images}, "
+        "bad_person_info={bad_person_info}).".format(
+            kept=stats["kept"],
+            dropped=stats["dropped"],
+            missing_id=stats["dropped_missing_id"],
+            missing_images=stats["dropped_missing_images"],
+            bad_person_info=stats["dropped_bad_person_info"],
+        )
+    )
     return 0
 
 
