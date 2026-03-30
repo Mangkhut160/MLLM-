@@ -1,9 +1,19 @@
 import json
 
+from src.data_engine.schema import (
+    FINAL_RESULT_PASS,
+    FINAL_RESULT_REVIEW,
+    POINT_STATUS_PASS,
+    POINT_STATUS_REJECT,
+    default_point_results,
+)
 from src.data_engine.sft_builder import build_sft_record, split_canonical_samples
+from src.prompt_baseline.prompt_templates import build_audit_prompt
 
 
 def _sample(sample_id: str) -> dict[str, object]:
+    point_results = default_point_results()
+    point_results["voltage_capacity_check"] = POINT_STATUS_REJECT
     return {
         "sample_id": sample_id,
         "input": {
@@ -19,15 +29,9 @@ def _sample(sample_id: str) -> dict[str, object]:
             },
         },
         "output": {
-            "point_results": {
-                "brand_check": "通过",
-                "date_check": "通过",
-                "voltage_capacity_check": "驳回",
-                "spec_check": "通过",
-                "image_check": "通过",
-            },
-            "final_result": "人工复核",
-            "reject_tags": ["电池额定电压/额定容量与填写信息不一致"],
+            "point_results": point_results,
+            "final_result": FINAL_RESULT_REVIEW,
+            "reject_tags": ["tag-a"],
         },
     }
 
@@ -53,19 +57,32 @@ def test_build_sft_record_formats_images_then_prompt_and_target():
         },
         {
             "type": "input_text",
-            "text": (
-                "You are auditing a battery listing. Check brand/date/voltage-capacity/"
-                "spec/image compliance.\n"
-                "Form fields:\n"
-                "- brand: Tianneng\n"
-                "- production_date: 2024-12-20 15:51:43\n"
-                "- voltage: 45V\n"
-                "- capacity: 72Ah\n"
-                "Return JSON with keys point_results, final_result, reject_tags."
-            ),
+            "text": build_audit_prompt(sample["input"]["form"]),
         },
     ]
     assert record["target"] == json.dumps(sample["output"], ensure_ascii=False)
+
+
+def test_build_audit_prompt_includes_explicit_response_contract():
+    prompt = build_audit_prompt(_sample("460790679")["input"]["form"])
+
+    assert "Image 1" in prompt
+    assert "brand image" in prompt
+    assert "Image 2" in prompt
+    assert "spec image" in prompt
+    assert "JSON object" in prompt
+    assert "point_results" in prompt
+    assert "final_result" in prompt
+    assert "reject_tags" in prompt
+    assert "brand_check" in prompt
+    assert "date_check" in prompt
+    assert "voltage_capacity_check" in prompt
+    assert "spec_check" in prompt
+    assert "image_check" in prompt
+    assert POINT_STATUS_PASS in prompt
+    assert POINT_STATUS_REJECT in prompt
+    assert FINAL_RESULT_PASS in prompt
+    assert FINAL_RESULT_REVIEW in prompt
 
 
 def test_split_canonical_samples_is_deterministic_and_exhaustive():

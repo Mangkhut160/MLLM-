@@ -79,7 +79,12 @@ def main() -> int:
         print(json.dumps(sample["output"], ensure_ascii=False, indent=2))
         return 0
 
-    parsed = parse_audit_response(response)
+    try:
+        parsed = parse_audit_response(response)
+    except ValueError as exc:
+        print(f"ERROR: invalid response: {exc}", file=sys.stderr)
+        return 1
+
     print("Parsed response:")
     print(json.dumps(parsed, ensure_ascii=False, indent=2))
     return 0

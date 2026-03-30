@@ -1,7 +1,16 @@
 import json
 from json import JSONDecodeError
 
-from src.data_engine.schema import CANONICAL_POINT_KEYS
+from src.data_engine.schema import (
+    CANONICAL_POINT_KEYS,
+    FINAL_RESULT_PASS,
+    FINAL_RESULT_REVIEW,
+    POINT_STATUS_PASS,
+    POINT_STATUS_REJECT,
+)
+
+ALLOWED_POINT_STATUSES = {POINT_STATUS_PASS, POINT_STATUS_REJECT}
+ALLOWED_FINAL_RESULTS = {FINAL_RESULT_PASS, FINAL_RESULT_REVIEW}
 
 
 def _strip_code_fence(raw_text: str) -> str:
@@ -44,10 +53,18 @@ def parse_audit_response(raw_text: str) -> dict[str, object]:
             f"Missing point_results keys: {', '.join(missing_point_keys)}"
         )
 
-    if not isinstance(payload["final_result"], str):
-        raise ValueError("final_result must be a string")
+    for key, value in point_results.items():
+        if value not in ALLOWED_POINT_STATUSES:
+            raise ValueError(f"Invalid point_results status for {key}: {value}")
 
-    if not isinstance(payload["reject_tags"], list):
+    final_result = payload["final_result"]
+    if final_result not in ALLOWED_FINAL_RESULTS:
+        raise ValueError(f"Invalid final_result: {final_result}")
+
+    reject_tags = payload["reject_tags"]
+    if not isinstance(reject_tags, list):
         raise ValueError("reject_tags must be a list")
+    if not all(isinstance(tag, str) for tag in reject_tags):
+        raise ValueError("reject_tags must contain only strings")
 
     return payload
