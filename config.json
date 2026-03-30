@@ -1,0 +1,18 @@
+{
+    "language": "zh_cn",
+    "output_dir": "workspace",
+    "delay": 0,
+    "timeout": 50,
+    "done_offset": "206",
+    "last_task_settings": {
+        "dpi": 150,
+        "ratio": 0.8,
+        "inpaint": true,
+        "inpaint_method": "background_smooth",
+        "image_only": false,
+        "force_regenerate": false,
+        "unify_font": true,
+        "font_name": "Calibri"
+    },
+    "hide_startup_dialog": true
+}
