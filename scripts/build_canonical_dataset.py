@@ -27,6 +27,16 @@ def _resolve_image_dir(repo_root: Path, preferred: str, fallback: str) -> Path:
     return preferred_path
 
 
+def _require_file(path: Path, label: str) -> None:
+    if not path.is_file():
+        raise SystemExit(f"ERROR: {label} file not found: {path}")
+
+
+def _require_dir(path: Path, label: str) -> None:
+    if not path.is_dir():
+        raise SystemExit(f"ERROR: {label} directory not found: {path}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build canonical dataset JSONL.")
     parser.add_argument("--csv", default="data.csv", help="Path to the source CSV.")
@@ -52,6 +62,10 @@ def main() -> int:
     brand_dir = _resolve_image_dir(repo_root, args.brand_dir, "brand_new")
     spec_dir = _resolve_image_dir(repo_root, args.spec_dir, "charge_new")
     output_path = _resolve_path(repo_root, args.output)
+
+    _require_file(csv_path, "--csv")
+    _require_dir(brand_dir, "--brand-dir")
+    _require_dir(spec_dir, "--spec-dir")
 
     records, stats = build_canonical_records(
         csv_path=csv_path,

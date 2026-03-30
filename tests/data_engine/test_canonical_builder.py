@@ -3,6 +3,8 @@ import shutil
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from src.data_engine.canonical_builder import (
     build_canonical_records,
     parse_person_info,
@@ -17,6 +19,13 @@ def _write_csv(path: Path, rows: list[dict[str, str]]) -> None:
         writer.writerows(rows)
 
 
+def _make_temp_dir() -> Path:
+    repo_root = Path(__file__).resolve().parents[2]
+    temp_root = repo_root / ".pytest_tmp"
+    temp_root.mkdir(parents=True, exist_ok=True)
+    return Path(tempfile.mkdtemp(prefix="canonical-", dir=temp_root))
+
+
 def test_parse_person_info_extracts_expected_fields():
     raw = "2024-12-20 15:51:43$%$45V$%$天能$%$72Ah"
 
@@ -28,11 +37,13 @@ def test_parse_person_info_extracts_expected_fields():
     }
 
 
-def test_build_canonical_records_associates_images_and_drops_missing():
-    repo_root = Path(__file__).resolve().parents[2]
-    temp_root = repo_root / ".pytest_tmp"
-    temp_root.mkdir(parents=True, exist_ok=True)
-    temp_dir = Path(tempfile.mkdtemp(prefix="canonical-", dir=temp_root))
+def test_parse_person_info_raises_on_malformed_input():
+    with pytest.raises(ValueError):
+        parse_person_info("2024-12-20$%$45V$%$天能")
+
+
+def test_build_canonical_records_uses_exact_png_and_prefers_id_png():
+    temp_dir = _make_temp_dir()
 
     try:
         brand_dir = temp_dir / "brand_new" / "brand_new"
@@ -41,8 +52,10 @@ def test_build_canonical_records_associates_images_and_drops_missing():
         spec_dir.mkdir(parents=True)
 
         (brand_dir / "123_brand.png").write_bytes(b"brand")
+        (brand_dir / "123.png").write_bytes(b"brand-png")
+        (brand_dir / "456.jpg").write_bytes(b"brand-jpg")
         (spec_dir / "123.png").write_bytes(b"spec")
-        (spec_dir / "456.png").write_bytes(b"spec2")
+        (spec_dir / "456.jpg").write_bytes(b"spec-jpg")
 
         csv_path = temp_dir / "data.csv"
         raw = "2024-12-20 15:51:43$%$45V$%$天能$%$72Ah"
@@ -68,12 +81,46 @@ def test_build_canonical_records_associates_images_and_drops_missing():
                 "input": {
                     "form": parse_person_info(raw),
                     "images": {
-                        "brand_image": "brand_new/brand_new/123_brand.png",
+                        "brand_image": "brand_new/brand_new/123.png",
                         "spec_image": "charge_new/charge_new/123.png",
                     },
                 },
                 "output": map_labels("label-a"),
             }
         ]
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_build_canonical_records_drops_malformed_person_info():
+    temp_dir = _make_temp_dir()
+
+    try:
+        brand_dir = temp_dir / "brand_new" / "brand_new"
+        spec_dir = temp_dir / "charge_new" / "charge_new"
+        brand_dir.mkdir(parents=True)
+        spec_dir.mkdir(parents=True)
+
+        (brand_dir / "777.png").write_bytes(b"brand")
+        (spec_dir / "777.png").write_bytes(b"spec")
+
+        csv_path = temp_dir / "data.csv"
+        raw = "2024-12-20$%$45V$%$天能"
+        _write_csv(
+            csv_path,
+            [
+                {"id": "777", "person_info": raw, "label": "label-a"},
+            ],
+        )
+
+        records, stats = build_canonical_records(
+            csv_path=csv_path,
+            brand_dir=brand_dir,
+            spec_dir=spec_dir,
+            repo_root=temp_dir,
+        )
+
+        assert stats == {"kept": 0, "dropped": 1}
+        assert records == []
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
