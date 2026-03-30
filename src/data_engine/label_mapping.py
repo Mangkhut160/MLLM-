@@ -35,20 +35,14 @@ def map_labels(raw_labels: str) -> Dict[str, object]:
     parsed_labels = _parse_raw_labels(raw_labels)
     point_results = default_point_results()
     reject_tags: List[str] = []
-    point_rejected = False
 
     for label in parsed_labels:
         reject_tags.append(label)
         canonical_key = RAW_LABEL_MAPPING.get(label)
         if canonical_key:
             point_results[canonical_key] = POINT_STATUS_REJECT
-            point_rejected = True
 
-    final_result = FINAL_RESULT_PASS if not parsed_labels else FINAL_RESULT_REVIEW
-    if not point_rejected and not parsed_labels:
-        final_result = FINAL_RESULT_PASS
-    if point_rejected:
-        final_result = FINAL_RESULT_REVIEW
+    final_result = FINAL_RESULT_REVIEW if parsed_labels else FINAL_RESULT_PASS
 
     return {
         "point_results": point_results,
