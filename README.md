@@ -117,6 +117,7 @@ At the current implementation stage, `scripts/train_grpo.py` validates the GRPO 
 - Use `docs/project/phase-1-report.md` for the stage-one implementation report.
 - Use `docs/project/phase-2-report.md` for the stage-one versus stage-two comparison report.
 - Use `docs/project/example-cases.md` to curate representative examples and record per-case observations.
+- Use `docs/project/autodl-runbook.md` for the AutoDL environment setup, `/root/autodl-tmp` layout, and stage-one/stage-two run commands.
 
 ## Demo Inference
 
