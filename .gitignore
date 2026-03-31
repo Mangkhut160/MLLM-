@@ -1,1 +1,10 @@
 .worktrees/
+.superpowers/
+__MACOSX/
+*.pyc
+__pycache__/
+.pytest_cache/
+.pytest_tmp/
+.DS_Store
+._*
+outputs/
